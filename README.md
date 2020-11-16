@@ -1,1 +1,135 @@
 # USA-Consumer-Forum-Data-Analysis
+
+We will be creating a spool directory on Desktop name flume_sink
+
+In conf file of flume directory
+
+agent1.sources.source1_1.spoolDir = /home/acadgild/Desktop/flume_sink
+
+agent1.sinks.hdfs-sink1_1.hdfs.path = hdfs://localhost.localdomain:9000/Project2
+
+
+flume-ng agent -n agent1 -f /home/acadgild/Downloads/apache-flume-1.6.0-bin/conf/AcadgildLocal.conf
+
+
+ /Project2/FlumeData.1499915272110
+
+A= load ' /Project2/FlumeData.1499915272110' using
+>> org.apache.pig.piggybank.storage.CSVExcelStorage
+>> (',','NO_MULTILINE','UNIX','SKIP_INPUT_HEADER')
+>> AS (daterec:chararray,product:chararray,subprod:chararray,
+>> issue:chararray,subissue:chararray,concomp:chararray,comppub:chararray,
+>> company:chararray,state:chararray,zcode:chararray,submit:chararray,
+>> datesent:chararray,
+>>compresp:chararray,timelyresp:chararray,consdis:chararray,compid:chararray);
+
+1)
+B= foreach A generate compid,timelyresp;
+C= filter B by timelyresp == 'Yes';
+D= group C by timelyresp;
+E = foreach D generate group,COUNT(C.timelyresp)
+dump E;
+
+(Yes,450724)
+
+store E into '/home/acadild/usadata' using PigStorage(',');
+
+//Storing the result to mysqlusing sqoop
+sqoop export --connect jdbc:mysql://localhost:3306/test --username root -P --table project21 --export-dir /home/acadild/usadata/part-r-00000
+
+//CMysql
+mysql> select * from project21;
++------------+-------+
+| complaints | count |
++------------+-------+
+| Yes        |    22 |
++------------+-------+
+1 row in set (0.00 sec)
+
+sqoop export --connect jdbc:mysql://localhost:3306/test --username root -P --table project21 --export-dir /home/acadild/usadata/part-r-00000
+
+2)
+ B= foreach A generate compid,daterec,datesent;
+C= filter B by daterec == datesent;// filter when both are equal
+D = group C all;
+E = foreach D generate group,COUNT(C.compid);
+dump E;
+
+(all,158172)
+store E into '/home/acadild/usadata1' using PigStorage(',');
+
+--Import the result in sql table
+sqoop export --connect jdbc:mysql://localhost:3306/test --username root -P --table project22 --export-dir /home/acadild/usadata1/part-r-00000
+
+
+mysql> select * from project22;
++----------------+--------+
+| noofcomplaints | count  |
++----------------+--------+
+| all            | 158172 |
++----------------+--------+
+
+
+
+3)
+ B = foreach A generate compid,company;
+C = group B by company;
+D = foreach C generate group,COUNT(B.compid);
+E = order D by $1 desc;
+F = limit E 10;
+dump F;
+
+(Bank of America,50720)
+(Wells Fargo,36782)
+(JPMorgan Chase,29330)
+(Equifax,24559)
+(Experian,24527)
+(Citibank,21910)
+(TransUnion,19924)
+(Ocwen,18688)
+(Capital One,13550)
+(Nationstar Mortgage,11231)
+
+store F into '/home/acadild/usadata2' using PigStorage(',');
+
+//Importing to mysql
+sqoop export --connect jdbc:mysql://localhost:3306/test --username root -P --table project23 --export-dir /home/acadild/usadata2/part-r-00000
+
+
+
+mysql> select * from project23;
++---------------------+-------+
+| company             | count |
++---------------------+-------+
+| Citibank            | 21910 |
+| TransUnion          | 19924 |
+| Ocwen               | 18688 |
+| Bank of America     | 50720 |
+| Wells Fargo         | 36782 |
+| JPMorgan Chase      | 29330 |
+| Equifax             | 24559 |
+| Experian            | 24527 |
+| Capital One         | 13550 |
+| Nationstar Mortgage | 11231 |
+
+
+4)
+B = foreach A generate compid,daterec,product;
+C = filter B by product == 'Debt collection';
+D= filter C by SUBSTRING(daterec,6,10) == '2015';
+ F = foreach E generate group,COUNT(D.compid);
+dump F;
+(Debt collection,31071)
+store F into '/home/acadild/usadata3' using PigStorage(',');
+
+//Exporting the data to mysql using sqoop
+
+ sqoop export --connect jdbc:mysql://localhost:3306/test --username root -P --table project24 --export-dir /home/acadild/usadata3/part-r-00000
+
+mysql> select * from project24;
++-----------------+-------+
+| debtcoll        | count |
++-----------------+-------+
+| Debt collection | 31071 |
++-----------------+-------+
+1 row in set (0.01 sec)
